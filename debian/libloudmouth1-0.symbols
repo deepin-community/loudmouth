@@ -13,6 +13,7 @@ libloudmouth-1.so.0 libloudmouth1-0 #MINVER#
  _lm_utils_free_callback@Base 1.1.4
  _lm_utils_hostname_to_punycode@Base 1.1.4
  _lm_utils_new_callback@Base 1.1.4
+ lm_asyncns_resolver_get_type@Base 1.5.4
  lm_blocking_resolver_get_type@Base 1.5.1
  lm_connection_authenticate@Base 1.1.4
  lm_connection_authenticate_and_block@Base 1.1.4
@@ -51,6 +52,7 @@ libloudmouth-1.so.0 libloudmouth1-0 #MINVER#
  lm_connection_unregister_reply_handler@Base 1.5.1
  lm_debug_init@Base 1.1.4
  lm_error_quark@Base 1.1.4
+ lm_feature_ping_get_type@Base 1.5.4
  lm_message_get_node@Base 1.1.4
  lm_message_get_sub_type@Base 1.1.4
  lm_message_get_type@Base 1.1.4
@@ -93,6 +95,7 @@ libloudmouth-1.so.0 libloudmouth1-0 #MINVER#
  lm_proxy_set_type@Base 1.1.4
  lm_proxy_set_username@Base 1.1.4
  lm_proxy_unref@Base 1.1.4
+ lm_resolver_get_type@Base 1.5.4
  lm_resolver_lookup@Base 1.5.1
  lm_resolver_new_for_host@Base 1.5.1
  lm_resolver_new_for_service@Base 1.5.1

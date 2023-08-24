@@ -38,18 +38,18 @@
 
 #define SRV_LEN 8192
 
-#define GET_PRIV(obj) (G_TYPE_INSTANCE_GET_PRIVATE ((obj), LM_TYPE_BLOCKING_RESOLVER, LmBlockingResolverPriv))
+#define GET_PRIV(obj) (lm_blocking_resolver_get_instance_private (LM_BLOCKING_RESOLVER(obj)))
 
-typedef struct LmBlockingResolverPriv LmBlockingResolverPriv;
-struct LmBlockingResolverPriv {
+typedef struct LmBlockingResolverPrivate LmBlockingResolverPrivate;
+struct LmBlockingResolverPrivate {
     GSource *idle_source;
 };
 
-static void     blocking_resolver_finalize    (GObject       *object);
+static void     blocking_resolver_dispose     (GObject       *object);
 static void     blocking_resolver_lookup      (LmResolver    *resolver);
 static void     blocking_resolver_cancel      (LmResolver    *resolver);
 
-G_DEFINE_TYPE (LmBlockingResolver, lm_blocking_resolver, LM_TYPE_RESOLVER)
+G_DEFINE_TYPE_WITH_PRIVATE (LmBlockingResolver, lm_blocking_resolver, LM_TYPE_RESOLVER)
 
 static void
 lm_blocking_resolver_class_init (LmBlockingResolverClass *class)
@@ -57,30 +57,24 @@ lm_blocking_resolver_class_init (LmBlockingResolverClass *class)
     GObjectClass    *object_class   = G_OBJECT_CLASS (class);
     LmResolverClass *resolver_class = LM_RESOLVER_CLASS (class);
 
-    object_class->finalize = blocking_resolver_finalize;
+    object_class->dispose = blocking_resolver_dispose;
 
     resolver_class->lookup = blocking_resolver_lookup;
     resolver_class->cancel = blocking_resolver_cancel;
-
-    g_type_class_add_private (object_class,
-                              sizeof (LmBlockingResolverPriv));
 }
 
 static void
 lm_blocking_resolver_init (LmBlockingResolver *blocking_resolver)
 {
-    (void) GET_PRIV (blocking_resolver);
 }
 
 static void
-blocking_resolver_finalize (GObject *object)
+blocking_resolver_dispose (GObject *object)
 {
-    (void) GET_PRIV (object);
-
     /* Ensure we don't have an idle around */
     blocking_resolver_cancel (LM_RESOLVER (object));
 
-    (G_OBJECT_CLASS (lm_blocking_resolver_parent_class)->finalize) (object);
+    (G_OBJECT_CLASS (lm_blocking_resolver_parent_class)->dispose) (object);
 }
 
 static gboolean
@@ -106,31 +100,10 @@ blocking_resolver_lookup_host (LmBlockingResolver *resolver)
     if (err != 0) {
         _lm_resolver_set_result (LM_RESOLVER (resolver), LM_RESOLVER_RESULT_FAILED,
                                  NULL);
-
         retval = FALSE;
-    }
-
-    if (ans == NULL) {
-        /* Couldn't find any results */
-        g_object_ref (resolver);
-        _lm_resolver_set_result (LM_RESOLVER (resolver), LM_RESOLVER_RESULT_FAILED,
-                                 NULL);
-
-        g_object_unref (resolver);
-        retval = FALSE;
-    }
-
-    /* FIXME: How to set and iterate the results */
-    /*priv->results    = ans;
-      priv->cur_result = ans; */
-
-    if (retval) {
-        g_object_ref (resolver);
-
+    } else {
         _lm_resolver_set_result (LM_RESOLVER (resolver), LM_RESOLVER_RESULT_OK,
                                  ans);
-
-        g_object_unref (resolver);
     }
 
     g_free (host);
@@ -194,7 +167,7 @@ blocking_resolver_lookup_service (LmBlockingResolver *resolver)
 static gboolean
 blocking_resolver_idle_lookup (LmBlockingResolver *resolver)
 {
-    LmBlockingResolverPriv *priv = GET_PRIV (resolver);
+    LmBlockingResolverPrivate *priv = GET_PRIV (resolver);
     gint                    type;
 
     /* Start the DNS querying */
@@ -219,7 +192,7 @@ blocking_resolver_idle_lookup (LmBlockingResolver *resolver)
 static void
 blocking_resolver_lookup (LmResolver *resolver)
 {
-    LmBlockingResolverPriv *priv;
+    LmBlockingResolverPrivate *priv;
     GMainContext           *context;
 
     g_return_if_fail (LM_IS_BLOCKING_RESOLVER (resolver));
@@ -236,7 +209,7 @@ blocking_resolver_lookup (LmResolver *resolver)
 static void
 blocking_resolver_cancel (LmResolver *resolver)
 {
-    LmBlockingResolverPriv *priv;
+    LmBlockingResolverPrivate *priv;
 
     g_return_if_fail (LM_IS_BLOCKING_RESOLVER (resolver));
 

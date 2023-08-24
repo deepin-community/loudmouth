@@ -1,3 +1,14 @@
+loudmouth (1.5.4-1) unstable; urgency=medium
+
+  * New upstream release
+  * debian/control: Bump debhelper compat to 13
+  * debian/copyright: Update copyright holders
+  * Remove obsolete patch for IPv6 support, applied upstream
+  * debian/patches/ and debian/rules: Build fixes
+  * Update symbols file with new API additions
+
+ -- Martin <debacle@debian.org>  Mon, 31 Jan 2022 14:41:21 +0000
+
 loudmouth (1.5.3-6) unstable; urgency=medium
 
   * Add dependency on libkrb5-dev, to enable SASL GSSAPI support.
@@ -10,7 +21,7 @@ loudmouth (1.5.3-5) unstable; urgency=medium
   * Add support for IPv6 (Closes: #921195)
   * Move maintainership from Gnome team to XMPP team
 
- -- W. Martin Borgert <debacle@debian.org>  Sun, 17 Feb 2019 22:34:08 +0000
+ -- Martin <debacle@debian.org>  Sun, 17 Feb 2019 22:34:08 +0000
 
 loudmouth (1.5.3-4) unstable; urgency=medium
 
