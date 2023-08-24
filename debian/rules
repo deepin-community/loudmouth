@@ -2,6 +2,7 @@
 
 export DEB_BUILD_MAINT_OPTIONS = hardening=+all
 export DEB_LDFLAGS_MAINT_APPEND = -Wl,-O1 -Wl,-z,defs -Wl,--as-needed
+export DEB_CFLAGS_MAINT_APPEND = -DGLIB_VERSION_MIN_REQUIRED=GLIB_VERSION_2_56
 
 %:
 	dh $@
@@ -18,9 +19,8 @@ override_dh_auto_configure:
 		--enable-gtk-doc \
 		--with-asyncns=yes
 
-override_dh_install:
+execute_before_dh_install:
 	find debian/tmp -name '*.la' -print -delete
-	dh_install
 
 override_dh_missing:
 	dh_missing --fail-missing

@@ -20,6 +20,7 @@
 
 #include <config.h>
 
+#include <errno.h>
 #include <string.h>
 #include <sys/types.h>
 
@@ -517,7 +518,7 @@ socket_connect_cb (GIOChannel   *source,
     /* addr = connect_data->current_addr; */
     fd = g_io_channel_unix_get_fd (source);
 
-    if (condition == G_IO_ERR) {
+    if (condition & (G_IO_ERR | G_IO_HUP | G_IO_NVAL)) {
         len = sizeof (err);
         _lm_sock_get_error (fd, &err, &len);
         if (!_lm_sock_is_blocking_error (err)) {
@@ -528,8 +529,8 @@ socket_connect_cb (GIOChannel   *source,
              * from it (by connecting to the next host) */
             if (!_lm_old_socket_failed_with_error (connect_data, err)) {
                 socket->watch_connect = NULL;
-                goto out;
             }
+            goto out;
         }
     }
 
@@ -605,7 +606,22 @@ socket_do_connect (LmConnectData *connect_data)
         port = htons (socket->port);
     }
 
-    ((struct sockaddr_in *) addr->ai_addr)->sin_port = port;
+    switch (addr->ai_family) {
+    case AF_INET:
+        ((struct sockaddr_in *) addr->ai_addr)->sin_port = port;
+        break;
+    case AF_INET6:
+        ((struct sockaddr_in6 *) addr->ai_addr)->sin6_port = port;
+        break;
+    default:
+        g_log (LM_LOG_DOMAIN, LM_LOG_LEVEL_VERBOSE,
+               "Unknown socket family %d\n", addr->ai_family);
+#ifndef G_OS_WIN32
+        return _lm_old_socket_failed_with_error (connect_data, EAFNOSUPPORT);
+#else
+        return _lm_old_socket_failed_with_error (connect_data, WSAEAFNOSUPPORT);
+#endif
+    }
 
     res = getnameinfo (addr->ai_addr,
                        (socklen_t)addr->ai_addrlen,
@@ -625,7 +641,6 @@ socket_do_connect (LmConnectData *connect_data)
                               addr->ai_protocol);
 
     if (!_LM_SOCK_VALID (fd)) {
-        g_print("invalid fd\n");
         g_log (LM_LOG_DOMAIN, LM_LOG_LEVEL_NET,
                "Failed making socket, error:%d...\n",
                _lm_sock_get_last_error ());
@@ -649,14 +664,14 @@ socket_do_connect (LmConnectData *connect_data)
         socket->watch_connect =
             lm_misc_add_io_watch (socket->context,
                                   connect_data->io_channel,
-                                  G_IO_OUT|G_IO_ERR,
+                                  G_IO_OUT | G_IO_ERR | G_IO_HUP | G_IO_NVAL,
                                   (GIOFunc) _lm_proxy_connect_cb,
                                   connect_data);
     } else {
         socket->watch_connect =
             lm_misc_add_io_watch (socket->context,
                                   connect_data->io_channel,
-                                  G_IO_OUT|G_IO_ERR,
+                                  G_IO_OUT | G_IO_ERR | G_IO_HUP | G_IO_NVAL,
                                   (GIOFunc) socket_connect_cb,
                                   connect_data);
     }
@@ -667,7 +682,6 @@ socket_do_connect (LmConnectData *connect_data)
         err = _lm_sock_get_last_error ();
         if (!_lm_sock_is_blocking_error (err)) {
             _lm_sock_close (connect_data->fd);
-            g_print("unable to connect\n");
             return _lm_old_socket_failed_with_error (connect_data, err);
         }
     }
@@ -765,46 +779,48 @@ old_socket_resolver_host_cb (LmResolver       *resolver,
 {
     LmOldSocket *socket = (LmOldSocket *) user_data;
     char dispbuf[128];
-    struct sockaddr_in *addr; /* FIXME:IPv6 */
-    const char *converr;
+    struct addrinfo *addr;
+    void *sock_addr;
 
     lm_verbose ("LmOldSocket::host_cb (result=%d)\n", result);
 
-    if (result != LM_RESOLVER_RESULT_OK) {
-        lm_verbose ("error while resolving, bailing out\n");
-        if (socket->connect_func) {
-            (socket->connect_func) (socket, FALSE, socket->user_data);
+    if (result == LM_RESOLVER_RESULT_OK) {
+        /* Find and use the first result with a supported address family */
+        while ((addr = lm_resolver_results_get_next (resolver))) {
+            switch (addr->ai_family) {
+            case AF_INET:
+                sock_addr = & (((struct sockaddr_in *) addr->ai_addr)->sin_addr);
+                break;
+            case AF_INET6:
+                sock_addr = & (((struct sockaddr_in6 *) addr->ai_addr)->sin6_addr);
+                break;
+            default:
+                g_log (LM_LOG_DOMAIN, LM_LOG_LEVEL_VERBOSE,
+                       "Resolver returned a socket address with unknown family %d\n", addr->ai_family);
+                continue;
+            }
+            if (inet_ntop (addr->ai_family, sock_addr, dispbuf, sizeof(dispbuf))) {
+                g_log (LM_LOG_DOMAIN, LM_LOG_LEVEL_VERBOSE,
+                       "Attempting Connection to %s\n", dispbuf);
+            } else {
+                g_log (LM_LOG_DOMAIN, LM_LOG_LEVEL_VERBOSE,
+                       "Attempting Connection (unable to convert address to presentable format)\n");
+            };
+            socket->connect_data->current_addr = addr;
+            socket_do_connect (socket->connect_data);
+            return;
         }
-        /*FIXME: Leaking Resolvers Until Clean Up Can Be Properly Handled
-        g_object_unref (socket->resolver);
-        socket->resolver = NULL;*/
-        g_free (socket->connect_data);
-        socket->connect_data = NULL;
-
-        return;
     }
 
-    socket->connect_data->current_addr =
-        lm_resolver_results_get_next (resolver);
-
-    if (socket->connect_data->current_addr) { /* FIXME:IPv6 */
-        addr = (struct sockaddr_in *) (socket->connect_data->current_addr->ai_addr);
-        converr = inet_ntop(AF_INET,&(addr->sin_addr),dispbuf,sizeof(dispbuf));
-        if (converr) {
-            g_log (LM_LOG_DOMAIN, LM_LOG_LEVEL_VERBOSE,
-                   "Attempting Connection to %s\n",dispbuf);
-        } else {
-            g_log (LM_LOG_DOMAIN, LM_LOG_LEVEL_VERBOSE,
-                   "Attempting Connection (unable to convert address to presentable format)\n");
-        };
-        socket_do_connect (socket->connect_data);
-    } else { /* FIXME: IPv6 Support? */
-        g_log (LM_LOG_DOMAIN,G_LOG_LEVEL_ERROR,
-               "Unable to locate server available over IPv4.\n");
-    };
-
-    /* FIXME: What do we do here?  How to make the mainloop exit with an
-       error, while having no ref to said mainloop */
+    lm_verbose ("error while resolving, bailing out\n");
+    if (socket->connect_func) {
+        (socket->connect_func) (socket, FALSE, socket->user_data);
+    }
+    /*FIXME: Leaking Resolvers Until Clean Up Can Be Properly Handled
+    g_object_unref (socket->resolver);
+    socket->resolver = NULL;*/
+    g_free (socket->connect_data);
+    socket->connect_data = NULL;
 }
 
 /* FIXME: Need to have a way to only get srv reply and then decide if the

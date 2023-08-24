@@ -1,1 +1,2 @@
-ipv6.patch
+add-missing-symbols.patch
+fix-la-filename.patch

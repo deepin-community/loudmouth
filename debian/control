@@ -2,8 +2,8 @@ Source: loudmouth
 Section: libs
 Priority: optional
 Maintainer: Debian XMPP Maintainers <pkg-xmpp-devel@lists.alioth.debian.org>
-Uploaders: W. Martin Borgert <debacle@debian.org>
-Build-Depends: debhelper (>= 11),
+Uploaders: Martin <debacle@debian.org>
+Build-Depends: debhelper-compat (= 13),
                gtk-doc-tools (>= 1.1-2),
                libglib2.0-dev,
                libgnutls28-dev (>= 3.0.20),

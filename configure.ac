@@ -1,5 +1,5 @@
 AC_PREREQ(2.60)
-AC_INIT([Loudmouth], [1.5.3])
+AC_INIT([Loudmouth], [1.5.4])
 AC_COPYRIGHT([
         Copyright (C) 2003-2008 Imendio AB
         Copyright (C) 2007 Collabora Ltd
@@ -10,7 +10,7 @@ AC_CONFIG_SRCDIR(loudmouth/loudmouth.h)
 AC_CONFIG_HEADERS(config.h)
 AC_CONFIG_AUX_DIR(build)
 AC_CONFIG_MACRO_DIR([m4])
-AM_INIT_AUTOMAKE([1.9 dist-bzip2 no-define -Wall])
+AM_INIT_AUTOMAKE([1.9 dist-bzip2 no-define subdir-objects -Wall])
 
 AM_MAINTAINER_MODE
 
@@ -55,7 +55,7 @@ AC_SUBST([LT_CURRENT])
 AC_SUBST([LT_REVISION])
 AC_SUBST([LT_AGE])
 
-AM_PATH_GLIB_2_0
+AM_PATH_GLIB_2_0(2.38.0)
 
 AC_CHECK_HEADERS([arpa/inet.h fcntl.h memory.h netdb.h netinet/in.h netinet/in_systm.h stdlib.h string.h sys/socket.h sys/time.h unistd.h])
 AC_CHECK_HEADERS([winsock2.h arpa/nameser_compat.h])
@@ -80,8 +80,8 @@ changequote([,])dnl
 AC_SUBST(CFLAGS)
 AC_SUBST(LDFLAGS)
 
-GLIB2_REQUIRED=2.12.4
-GLIB2_TEST_REQUIRED=2.16.0
+GLIB2_REQUIRED=2.38.0
+GLIB2_TEST_REQUIRED=2.38.0
 GNUTLS_REQUIRED=3.0.20
 LIBTASN1_REQUIRED=0.2.6
 
@@ -109,9 +109,22 @@ else
 fi
 AC_SUBST([TEST_DIRS])
 
-PKG_CHECK_MODULES(LIBIDN, libidn, have_idn=yes, have_idn=no)
-if test "x$have_idn" = "xyes"; then
-        AC_DEFINE(HAVE_IDN, 1, [Define if IDN support is included])
+dnl +--------------------------------------------------------+
+dnl | Checking for libidn support                            |-
+dnl +--------------------------------------------------------+
+AC_ARG_WITH(idn,
+            AS_HELP_STRING([--with-idn=@<:@auto|no@:>@],
+                           [Whether to use libidn [[default=auto]]]),
+            ac_idn=$withval,
+            ac_idn=auto)
+
+if test "x$ac_idn" = "xauto"; then
+  PKG_CHECK_MODULES(LIBIDN, libidn, enable_idn=yes, enable_idn=no)
+  if test "x$enable_idn" = "xyes"; then
+    AC_DEFINE(HAVE_IDN, 1, [Define if IDN support is included])
+  fi
+else
+  enable_idn=no
 fi
 
 dnl Gtk doc
@@ -323,7 +336,7 @@ echo "
 
         prefix:                   ${prefix}
         compiler:                 ${CC}
-        Have IDN support:         ${have_idn}
+        Enable IDN support:       ${enable_idn}
         Enable SSL:               ${enable_ssl}
         Asynchronous DNS:         ${enable_asyncns}
         Linux TCP keepalives:     ${use_keepalives}
